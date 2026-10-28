@@ -10,12 +10,33 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
 
 type PaymentMethod = "COD" | "RAZORPAY";
 
+declare global {
+    interface Window {
+        Razorpay?: new (options: Record<string, unknown>) => {
+            open: () => void;
+            on: (event: string, callback: (response: any) => void) => void;
+        };
+    }
+}
+
+function getCheckoutRequestId() {
+    const key = "alphaMaleCheckoutRequestId";
+    let id = sessionStorage.getItem(key);
+
+    if (!id) {
+        id = crypto.randomUUID();
+        sessionStorage.setItem(key, id);
+    }
+
+    return id;
+}
+
+
 export default function CheckoutPage() {
     const router = useRouter();
     const { items, loading, clearCart } = useCart();
 
-    const [paymentMethod, setPaymentMethod] =
-        useState<PaymentMethod>("COD");
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
     const [billingDifferent, setBillingDifferent] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
@@ -38,14 +59,11 @@ export default function CheckoutPage() {
 
     const subtotal = items.reduce(
         (sum, item) => sum + Number(item.price) * item.quantity,
-        0
+        0,
     );
 
     const codBlocked = subtotal > 3000;
-
-    const onlineDiscount =
-        paymentMethod === "RAZORPAY" ? subtotal * 0.05 : 0;
-
+    const onlineDiscount = paymentMethod === "RAZORPAY" ? subtotal * 0.05 : 0;
     const total = Math.max(0, subtotal - onlineDiscount);
 
     const formatPrice = (amount: number) =>
@@ -55,10 +73,7 @@ export default function CheckoutPage() {
         });
 
     function updateField(name: string, value: string) {
-        setForm((previous) => ({
-            ...previous,
-            [name]: value,
-        }));
+        setForm((previous) => ({ ...previous, [name]: value }));
     }
 
     useEffect(() => {
@@ -76,13 +91,15 @@ export default function CheckoutPage() {
             return;
         }
 
-        if (paymentMethod === "COD" && codBlocked) {
-            setError("COD is unavailable for orders above ₹3,000.");
+        if (!API_URL) {
+            setError("NEXT_PUBLIC_API_URL is not configured.");
             return;
         }
 
-        if (!API_URL) {
-            setError("NEXT_PUBLIC_API_URL is not configured.");
+        if (paymentMethod === "COD") {
+            setError(
+                "COD checkout is not connected to the current payment endpoint yet. Please select Razorpay.",
+            );
             return;
         }
 
@@ -90,48 +107,44 @@ export default function CheckoutPage() {
 
         try {
             const guestId = localStorage.getItem("guestId");
+            const checkoutRequestId = getCheckoutRequestId();
 
-            const response = await fetch(`${API_URL}/orders`, {
+            const response = await fetch(`${API_URL}/payments/create-order`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    "Idempotency-Key": checkoutRequestId,
                     ...(guestId ? { "x-guest-id": guestId } : {}),
                 },
                 body: JSON.stringify({
+                    checkoutRequestId,
                     customer: {
-                        email: form.email,
-                        firstName: form.firstName,
-                        lastName: form.lastName,
-                        phone: form.phone,
+                        email: form.email.trim(),
+                        firstName: form.firstName.trim(),
+                        lastName: form.lastName.trim(),
+                        phone: form.phone.trim(),
                     },
-
                     shippingAddress: {
-                        address: form.address,
-                        apartment: form.apartment,
-                        city: form.city,
-                        state: form.state,
-                        pincode: form.pincode,
+                        address: form.address.trim(),
+                        apartment: form.apartment.trim() || undefined,
+                        city: form.city.trim(),
+                        state: form.state.trim(),
+                        pincode: form.pincode.trim(),
                         country: "India",
                     },
-
                     billingAddress: billingDifferent
                         ? {
-                            address: form.billingAddress,
-                            city: form.billingCity,
-                            state: form.billingState,
-                            pincode: form.billingPincode,
+                            address: form.billingAddress.trim(),
+                            city: form.billingCity.trim(),
+                            state: form.billingState.trim(),
+                            pincode: form.billingPincode.trim(),
                             country: "India",
                         }
                         : undefined,
-
-                    // Send product IDs and quantities only.
-                    // Backend must calculate prices and discounts.
                     items: items.map((item) => ({
-                        productId: item._id,
-                        quantity: item.quantity,
+                        product_id: item._id,
+                        qty: item.quantity,
                     })),
-
-                    paymentMethod,
                 }),
             });
 
@@ -139,46 +152,26 @@ export default function CheckoutPage() {
 
             if (!response.ok) {
                 throw new Error(
-                    result.message || "Unable to place your order."
+                    Array.isArray(result.message)
+                        ? result.message.join(", ")
+                        : result.message || "Unable to create payment order.",
                 );
             }
 
-            if (paymentMethod === "RAZORPAY") {
-                const paymentUrl =
-                    result.paymentUrl ||
-                    result.checkoutUrl ||
-                    result.payment?.checkoutUrl;
 
-                if (paymentUrl) {
-                    window.location.href = paymentUrl;
-                    return;
-                }
 
-                throw new Error(
-                    "The backend did not return a payment URL. Check your Razorpay integration."
-                );
+            if (!result.payment_url) {
+                throw new Error("Payment URL was not returned by the server.");
             }
 
-            const orderId =
-                result.order?._id ||
-                result.orderId ||
-                result._id;
-
-            if (!orderId) {
-                throw new Error(
-                    "The backend did not return an order ID."
-                );
-            }
-
-            await clearCart();
-            router.push(`/order-success/${orderId}`);
+            window.location.href = result.payment_url;
+            return;
         } catch (err) {
             setError(
                 err instanceof Error
                     ? err.message
-                    : "Something went wrong. Please try again."
+                    : "Something went wrong. Please try again.",
             );
-        } finally {
             setSubmitting(false);
         }
     }
@@ -201,7 +194,6 @@ export default function CheckoutPage() {
                     <Link href="/" className="text-xl font-bold">
                         Alpha Male
                     </Link>
-
                     <Link href="/" className="text-sm text-blue-700 hover:underline">
                         Continue shopping
                     </Link>
@@ -210,19 +202,13 @@ export default function CheckoutPage() {
 
             <div className="mx-auto grid max-w-5xl grid-cols-1 lg:grid-cols-[1.15fr_0.85fr]">
                 <section className="px-5 py-8 sm:px-8 lg:py-10">
-                    <h1 className="mb-7 text-2xl font-semibold">
-                        Checkout
-                    </h1>
+                    <h1 className="mb-7 text-2xl font-semibold">Checkout</h1>
 
                     <form onSubmit={handleSubmit} className="space-y-8">
                         <section>
                             <div className="mb-3 flex items-center justify-between">
                                 <h2 className="text-lg font-semibold">Contact</h2>
-
-                                <Link
-                                    href="/login"
-                                    className="text-sm text-blue-700 underline"
-                                >
+                                <Link href="/login" className="text-sm text-blue-700 underline">
                                     Sign in
                                 </Link>
                             </div>
@@ -238,19 +224,13 @@ export default function CheckoutPage() {
                             />
 
                             <label className="mt-3 flex items-center gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    className="h-4 w-4 accent-blue-600"
-                                />
+                                <input type="checkbox" className="h-4 w-4 accent-blue-600" />
                                 Email me with news and offers
                             </label>
                         </section>
 
                         <section>
-                            <h2 className="mb-4 text-lg font-semibold">
-                                Delivery
-                            </h2>
-
+                            <h2 className="mb-4 text-lg font-semibold">Delivery</h2>
                             <p className="mb-3 rounded-lg border border-gray-200 px-3 py-3 text-sm">
                                 Country / Region: India
                             </p>
@@ -261,20 +241,15 @@ export default function CheckoutPage() {
                                     placeholder="First name"
                                     autoComplete="given-name"
                                     value={form.firstName}
-                                    onChange={(e) =>
-                                        updateField("firstName", e.target.value)
-                                    }
+                                    onChange={(e) => updateField("firstName", e.target.value)}
                                     className={inputClass}
                                 />
-
                                 <input
                                     required
                                     placeholder="Last name"
                                     autoComplete="family-name"
                                     value={form.lastName}
-                                    onChange={(e) =>
-                                        updateField("lastName", e.target.value)
-                                    }
+                                    onChange={(e) => updateField("lastName", e.target.value)}
                                     className={inputClass}
                                 />
                             </div>
@@ -305,7 +280,6 @@ export default function CheckoutPage() {
                                     onChange={(e) => updateField("city", e.target.value)}
                                     className={inputClass}
                                 />
-
                                 <input
                                     required
                                     placeholder="State"
@@ -314,7 +288,6 @@ export default function CheckoutPage() {
                                     onChange={(e) => updateField("state", e.target.value)}
                                     className={inputClass}
                                 />
-
                                 <input
                                     required
                                     placeholder="PIN code"
@@ -341,10 +314,7 @@ export default function CheckoutPage() {
                         </section>
 
                         <section>
-                            <h2 className="mb-3 text-lg font-semibold">
-                                Shipping method
-                            </h2>
-
+                            <h2 className="mb-3 text-lg font-semibold">Shipping method</h2>
                             <div className="rounded-lg bg-gray-100 px-4 py-5 text-center text-sm text-gray-500">
                                 Shipping charges will be confirmed based on your delivery
                                 address.
@@ -353,7 +323,6 @@ export default function CheckoutPage() {
 
                         <section>
                             <h2 className="text-lg font-semibold">Payment</h2>
-
                             <div className="mt-3 rounded-xl border border-green-200 bg-green-50 p-4">
                                 <p className="font-semibold text-green-800">
                                     Get 5% OFF with Online Payment!
@@ -370,10 +339,8 @@ export default function CheckoutPage() {
                             <div className="mt-4 overflow-hidden rounded-xl border border-gray-300">
                                 <label
                                     className={`flex items-center gap-3 border-b border-gray-200 p-4 ${codBlocked
-                                            ? "cursor-not-allowed bg-gray-100 opacity-50"
-                                            : paymentMethod === "COD"
-                                                ? "cursor-pointer bg-blue-50 ring-1 ring-inset ring-blue-500"
-                                                : "cursor-pointer bg-white"
+                                        ? "cursor-not-allowed bg-gray-100 opacity-50"
+                                        : "cursor-pointer bg-white"
                                         }`}
                                 >
                                     <input
@@ -385,18 +352,12 @@ export default function CheckoutPage() {
                                         onChange={() => setPaymentMethod("COD")}
                                         className="h-4 w-4 accent-blue-600"
                                     />
-
                                     <span className="text-sm font-medium">
                                         Cash on Delivery (COD)
                                     </span>
                                 </label>
 
-                                <label
-                                    className={`flex cursor-pointer items-center gap-3 p-4 ${paymentMethod === "RAZORPAY"
-                                            ? "bg-blue-50 ring-1 ring-inset ring-blue-500"
-                                            : "bg-white"
-                                        }`}
-                                >
+                                <label className="flex cursor-pointer items-center gap-3 p-4">
                                     <input
                                         type="radio"
                                         name="paymentMethod"
@@ -405,7 +366,6 @@ export default function CheckoutPage() {
                                         onChange={() => setPaymentMethod("RAZORPAY")}
                                         className="h-4 w-4 accent-blue-600"
                                     />
-
                                     <span className="text-sm font-medium">
                                         Razorpay — 5% OFF
                                     </span>
@@ -420,33 +380,22 @@ export default function CheckoutPage() {
                             )}
 
                             {paymentMethod === "COD" && (
-                                <div className="mt-3 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-700">
-                                    <p>
-                                        We recommend choosing the{" "}
-                                        <strong>PREPAID</strong> option for faster delivery and
-                                        priority support.
-                                    </p>
-
-                                    <p>
-                                        <strong>NOTE:</strong> You need to confirm your order by
-                                        replying <strong>&apos;YES&apos;</strong> to the
-                                        confirmation message you&apos;ll receive on WhatsApp.
-                                    </p>
-                                </div>
+                                <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                                    COD is not yet connected to the payment endpoint. Select
+                                    Razorpay to continue.
+                                </p>
                             )}
 
                             {paymentMethod === "RAZORPAY" && (
                                 <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-800">
-                                    You save ₹{formatPrice(onlineDiscount)} with online payment.
+                                    Estimated saving: ₹{formatPrice(onlineDiscount)}. Final
+                                    pricing is calculated by the server.
                                 </p>
                             )}
                         </section>
 
                         <section>
-                            <h2 className="mb-3 text-lg font-semibold">
-                                Billing address
-                            </h2>
-
+                            <h2 className="mb-3 text-lg font-semibold">Billing address</h2>
                             <div className="overflow-hidden rounded-xl border border-gray-300">
                                 <label className="flex cursor-pointer items-center gap-3 border-b border-gray-200 p-4">
                                     <input
@@ -456,9 +405,7 @@ export default function CheckoutPage() {
                                         onChange={() => setBillingDifferent(false)}
                                         className="h-4 w-4 accent-blue-600"
                                     />
-                                    <span className="text-sm">
-                                        Same as shipping address
-                                    </span>
+                                    <span className="text-sm">Same as shipping address</span>
                                 </label>
 
                                 <label className="flex cursor-pointer items-center gap-3 p-4">
@@ -486,7 +433,6 @@ export default function CheckoutPage() {
                                         }
                                         className={inputClass}
                                     />
-
                                     <input
                                         required
                                         placeholder="City"
@@ -496,7 +442,6 @@ export default function CheckoutPage() {
                                         }
                                         className={inputClass}
                                     />
-
                                     <input
                                         required
                                         placeholder="State"
@@ -506,7 +451,6 @@ export default function CheckoutPage() {
                                         }
                                         className={inputClass}
                                     />
-
                                     <input
                                         required
                                         placeholder="PIN code"
@@ -536,23 +480,21 @@ export default function CheckoutPage() {
                             disabled={
                                 submitting ||
                                 !items.length ||
-                                (paymentMethod === "COD" && codBlocked)
+                                paymentMethod === "COD"
                             }
                             className="w-full rounded-xl bg-blue-700 px-5 py-4 font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {submitting
-                                ? "Processing order..."
+                                ? "Processing payment..."
                                 : paymentMethod === "COD"
-                                    ? "Complete order"
+                                    ? "COD unavailable"
                                     : "Continue to payment"}
                         </button>
                     </form>
                 </section>
 
                 <aside className="border-t border-gray-200 bg-gray-50 px-5 py-8 sm:px-8 lg:border-l lg:border-t-0 lg:py-10">
-                    <h2 className="mb-6 text-lg font-semibold">
-                        Order summary
-                    </h2>
+                    <h2 className="mb-6 text-lg font-semibold">Order summary</h2>
 
                     <div className="space-y-5">
                         {items.map((item) => (
@@ -590,26 +532,24 @@ export default function CheckoutPage() {
 
                     <div className="mt-6 space-y-3 border-t border-gray-200 pt-5 text-sm">
                         <div className="flex justify-between">
-                            <span className="text-gray-600">Subtotal</span>
+                            <span className="text-gray-600">Subtotal (estimate)</span>
                             <span>₹{formatPrice(subtotal)}</span>
                         </div>
 
                         {onlineDiscount > 0 && (
                             <div className="flex justify-between text-green-700">
-                                <span>Online payment discount (5%)</span>
+                                <span>Online payment discount (5%, estimate)</span>
                                 <span>−₹{formatPrice(onlineDiscount)}</span>
                             </div>
                         )}
 
                         <div className="flex justify-between">
                             <span className="text-gray-600">Shipping</span>
-                            <span className="text-gray-500">
-                                Calculated at checkout
-                            </span>
+                            <span className="text-gray-500">Calculated at checkout</span>
                         </div>
 
                         <div className="flex justify-between border-t border-gray-200 pt-4 text-base font-semibold">
-                            <span>Total</span>
+                            <span>Estimated total</span>
                             <span>₹{formatPrice(total)}</span>
                         </div>
                     </div>
