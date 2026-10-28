@@ -1,6 +1,7 @@
 
 "use client";
 
+import Link from "next/link";
 import type { StoreProduct } from "./ProductSection";
 
 export type CartItem = StoreProduct & {
@@ -11,7 +12,10 @@ type CartDrawerProps = {
     open: boolean;
     items: CartItem[];
     onClose: () => void;
-    onUpdateQuantity: (id: string, quantity: number) => void;
+    onUpdateQuantity: (
+        productId: string,
+        quantity: number
+    ) => void | Promise<void>;
 };
 
 export default function CartDrawer({
@@ -22,128 +26,157 @@ export default function CartDrawer({
 }: CartDrawerProps) {
     if (!open) return null;
 
-    const total = items.reduce(
+    const subtotal = items.reduce(
         (sum, item) => sum + Number(item.price) * item.quantity,
         0
     );
 
+    const formatPrice = (price: number) =>
+        price.toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+
     return (
         <div className="fixed inset-0 z-50">
             <button
+                type="button"
                 aria-label="Close cart"
                 onClick={onClose}
-                className="absolute inset-0 bg-black/40"
+                className="absolute inset-0 h-full w-full bg-black/50"
             />
 
-            <aside className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
-                <div className="flex items-center justify-between border-b p-5">
-                    <div>
-                        <h2 className="text-xl font-bold">Your Cart</h2>
-                        <p className="mt-1 text-sm text-gray-500">
-                            {items.reduce((sum, item) => sum + item.quantity, 0)} items
-                        </p>
-                    </div>
+            <aside
+                role="dialog"
+                aria-modal="true"
+                aria-label="Shopping cart"
+                className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-xl"
+            >
+                <header className="flex items-center justify-between border-b p-5">
+                    <h2 className="text-xl font-semibold">
+                        Your Cart ({items.reduce((sum, item) => sum + item.quantity, 0)})
+                    </h2>
 
                     <button
+                        type="button"
                         onClick={onClose}
-                        className="rounded-full px-3 py-2 text-gray-500 hover:bg-gray-100"
                         aria-label="Close cart"
+                        className="rounded p-2 text-2xl hover:bg-gray-100"
                     >
-                        ✕
+                        ×
                     </button>
-                </div>
+                </header>
 
-                <div className="flex-1 space-y-5 overflow-y-auto p-5">
+                <div className="flex-1 overflow-y-auto p-5">
                     {items.length === 0 ? (
-                        <div className="py-16 text-center">
-                            <p className="text-lg font-semibold">Your cart is empty</p>
-                            <p className="mt-2 text-sm text-gray-500">
-                                Add a few products to get started.
-                            </p>
+                        <div className="py-12 text-center">
+                            <p className="text-gray-600">Your cart is empty.</p>
                             <button
+                                type="button"
                                 onClick={onClose}
-                                className="mt-5 rounded-full bg-gray-900 px-5 py-3 text-white"
+                                className="mt-4 font-medium text-blue-700 hover:underline"
                             >
-                                Continue Shopping
+                                Continue shopping
                             </button>
                         </div>
                     ) : (
-                        items.map((item) => (
-                            <div key={item._id} className="flex gap-4">
-                                <div className="h-24 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100">
-                                    {item.images?.[0] && (
-                                        <img
-                                            src={item.images[0]}
-                                            alt={item.name}
-                                            className="h-full w-full object-cover"
-                                        />
-                                    )}
-                                </div>
+                        <div className="space-y-5">
+                            {items.map((item) => (
+                                <div key={item._id} className="flex gap-4">
+                                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                                        {item.images?.[0] ? (
+                                            <img
+                                                src={item.images[0]}
+                                                alt={item.name}
+                                                className="h-full w-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="flex h-full items-center justify-center text-xs text-gray-400">
+                                                No image
+                                            </div>
+                                        )}
+                                    </div>
 
-                                <div className="min-w-0 flex-1">
-                                    <h3 className="truncate font-semibold">{item.name}</h3>
-                                    <p className="mt-1 font-bold">
-                                        ₹{Number(item.price).toLocaleString("en-IN")}
-                                    </p>
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="font-medium">{item.name}</h3>
 
-                                    <div className="mt-3 flex items-center gap-3">
-                                        <button
-                                            onClick={() =>
-                                                onUpdateQuantity(item._id, item.quantity - 1)
-                                            }
-                                            className="h-8 w-8 rounded-full border"
-                                            aria-label={`Decrease ${item.name} quantity`}
-                                        >
-                                            −
-                                        </button>
+                                        <p className="mt-1 text-sm text-gray-600">
+                                            ₹{formatPrice(Number(item.price))}
+                                        </p>
 
-                                        <span className="text-sm">{item.quantity}</span>
+                                        <div className="mt-3 flex items-center gap-3">
+                                            <button
+                                                type="button"
+                                                aria-label={`Decrease quantity of ${item.name}`}
+                                                onClick={() =>
+                                                    onUpdateQuantity(item._id, item.quantity - 1)
+                                                }
+                                                className="h-8 w-8 rounded border hover:bg-gray-100"
+                                            >
+                                                −
+                                            </button>
 
-                                        <button
-                                            onClick={() =>
-                                                onUpdateQuantity(item._id, item.quantity + 1)
-                                            }
-                                            disabled={
-                                                typeof item.stock === "number" &&
-                                                item.quantity >= item.stock
-                                            }
-                                            className="h-8 w-8 rounded-full border disabled:opacity-40"
-                                            aria-label={`Increase ${item.name} quantity`}
-                                        >
-                                            +
-                                        </button>
+                                            <span className="min-w-4 text-center text-sm">
+                                                {item.quantity}
+                                            </span>
 
-                                        <button
-                                            onClick={() => onUpdateQuantity(item._id, 0)}
-                                            className="ml-auto text-sm text-red-600 hover:underline"
-                                        >
-                                            Remove
-                                        </button>
+                                            <button
+                                                type="button"
+                                                aria-label={`Increase quantity of ${item.name}`}
+                                                disabled={
+                                                    typeof item.stock === "number" &&
+                                                    item.quantity >= item.stock
+                                                }
+                                                onClick={() =>
+                                                    onUpdateQuantity(item._id, item.quantity + 1)
+                                                }
+                                                className="h-8 w-8 rounded border hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                            >
+                                                +
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => onUpdateQuantity(item._id, 0)}
+                                                className="ml-auto text-sm text-red-600 hover:underline"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))
+                            ))}
+                        </div>
                     )}
                 </div>
 
                 {items.length > 0 && (
-                    <div className="border-t p-5">
-                        <div className="mb-4 flex justify-between text-lg font-bold">
+                    <footer className="space-y-4 border-t p-5">
+                        <div className="flex justify-between text-base font-semibold">
                             <span>Subtotal</span>
-                            <span>₹{total.toLocaleString("en-IN")}</span>
+                            <span>₹{formatPrice(subtotal)}</span>
                         </div>
-                        <p className="mb-4 text-xs text-gray-500">
-                            Shipping and taxes, if applicable, are calculated at checkout.
+
+                        <p className="text-xs text-gray-500">
+                            Shipping and discounts are calculated at checkout.
                         </p>
-                        <button
-                            onClick={() =>
-                                alert("Checkout is not connected yet.")
-                            }
-                            className="w-full rounded-full bg-gray-900 py-3.5 font-semibold text-white hover:bg-orange-600"
+
+                        <Link
+                            href="/checkout"
+                            onClick={onClose}
+                            className="block w-full rounded-lg bg-blue-700 px-4 py-3 text-center font-semibold text-white hover:bg-blue-800"
                         >
-                            Proceed to Checkout
+                            Checkout
+                        </Link>
+
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="w-full text-center text-sm text-gray-600 hover:underline"
+                        >
+                            Continue shopping
                         </button>
-                    </div>
+                    </footer>
                 )}
             </aside>
         </div>

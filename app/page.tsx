@@ -1,86 +1,120 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Navbar from "./components/store/Navbar";
 import HeroSlider from "./components/store/HeroSlider";
 import ProductSection, {
-  StoreProduct,
+  type StoreProduct,
 } from "./components/store/ProductSection";
-import CartDrawer, {
-  CartItem,
-} from "./components/store/CartDrawer";
+import CartDrawer from "./components/store/CartDrawer";
 import Footer from "./components/store/Footer";
-
+import useCart from "@/hooks/useCart";
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function HomePage() {
   const [products, setProducts] = useState<StoreProduct[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const {
+    items,
+    loading: cartLoading,
+    cartError,
+    addToCart,
+    updateQuantity,
+  } = useCart();
+
+  // Fetch products
   useEffect(() => {
+    let cancelled = false;
+
     async function loadProducts() {
       try {
         const response = await fetch(
           `${API_URL}/product?page=1&limit=12`
         );
 
-        if (!response.ok) throw new Error("Failed to fetch products");
+        if (!response.ok) {
+          throw new Error("Failed to fetch products");
+        }
 
         const result = await response.json();
 
-        // Supports your paginated API response and a plain array.
         const list = Array.isArray(result)
           ? result
-          : result.products ?? result.data?.products ?? result.data ?? [];
+          : result.products ??
+          result.data?.products ??
+          result.data ??
+          [];
 
-        setProducts(
-          list.filter(
-            (product: StoreProduct) => product.isActive !== false
-          )
-        );
+        if (!Array.isArray(list)) {
+          throw new Error("Invalid products response");
+        }
+
+        if (!cancelled) {
+          setProducts(
+            list.filter(
+              (product: StoreProduct) =>
+                product.isActive !== false
+            )
+          );
+        }
       } catch (error) {
         console.error("Could not load products:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
-    loadProducts();
+    void loadProducts();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  function addToCart(product: StoreProduct) {
-    setCart((current) => {
-      const existing = current.find((item) => item._id === product._id);
-
-      if (existing) {
-        return current.map((item) =>
-          item._id === product._id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+  // Add product through the backend API
+  const handleAddToCart = useCallback(
+    async (product: StoreProduct) => {
+      try {
+        await addToCart(product);
+        setCartOpen(true);
+      } catch (error) {
+        alert(
+          error instanceof Error
+            ? error.message
+            : cartError || "Unable to add product to cart"
         );
       }
+    },
+    [addToCart, cartError]
+  );
 
-      return [...current, { ...product, quantity: 1 }];
-    });
+  // Update quantity or remove product through the backend API
+  const handleUpdateQuantity = useCallback(
+    async (productId: string, quantity: number) => {
+      try {
+        await updateQuantity(productId, quantity);
+      } catch (error) {
+        alert(
+          error instanceof Error
+            ? error.message
+            : "Unable to update cart. Please try again."
+        );
+      }
+    },
+    [updateQuantity]
+  );
 
-    setCartOpen(true);
-  }
-
-  function updateQuantity(id: string, quantity: number) {
-    setCart((current) =>
-      quantity <= 0
-        ? current.filter((item) => item._id !== id)
-        : current.map((item) =>
-          item._id === id ? { ...item, quantity } : item
-        )
-    );
-  }
-
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
+  // Total number of items in the cart
+  const cartCount = items.reduce(
+    (total, item) => total + item.quantity,
+    0
+  );
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -92,17 +126,22 @@ export default function HomePage() {
       <main>
         <HeroSlider />
 
-        <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <section
+          id="products"
+          className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8"
+        >
           <div className="mb-8 flex items-end justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-widest text-orange-600">
                 Our collection
               </p>
+
               <h2 className="mt-2 text-3xl font-bold sm:text-4xl">
                 Featured Products
               </h2>
+
               <p className="mt-2 text-gray-500">
-                Find something you'll love.
+                Find something you&apos;ll love.
               </p>
             </div>
           </div>
@@ -119,7 +158,7 @@ export default function HomePage() {
           ) : (
             <ProductSection
               products={products}
-              onAddToCart={addToCart}
+              onAddToCart={handleAddToCart}
             />
           )}
         </section>
@@ -131,20 +170,28 @@ export default function HomePage() {
           <p className="text-sm font-semibold uppercase tracking-widest text-orange-600">
             Made for everyday living
           </p>
+
           <h2 className="mt-3 text-3xl font-bold">
             Quality products. Simple shopping.
           </h2>
+
           <p className="mx-auto mt-4 max-w-2xl text-gray-600">
-            Discover products chosen with care, with a shopping experience
-            designed to be simple and enjoyable.
+            Discover products chosen with care, with a shopping
+            experience designed to be simple and enjoyable.
           </p>
         </section>
 
-        <section id="contact" className="px-4 py-12 text-center">
+        <section
+          id="contact"
+          className="px-4 py-12 text-center"
+        >
           <h2 className="text-2xl font-bold">Need help?</h2>
+
           <p className="mt-2 text-gray-600">
-            Have a question about an order or product? Get in touch with us.
+            Have a question about an order or product? Get in touch
+            with us.
           </p>
+
           <a
             href="mailto:support@example.com"
             className="mt-5 inline-block rounded-full bg-gray-900 px-6 py-3 text-white hover:bg-orange-600"
@@ -158,9 +205,9 @@ export default function HomePage() {
 
       <CartDrawer
         open={cartOpen}
-        items={cart}
+        items={items}
         onClose={() => setCartOpen(false)}
-        onUpdateQuantity={updateQuantity}
+        onUpdateQuantity={handleUpdateQuantity}
       />
     </div>
   );

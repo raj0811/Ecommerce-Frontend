@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AddProductModal from "./modals/AddProductModal";
 import RecentLandingPages from "./Components/RecentLandingPages";
+import AdminSidebar from "./Components/AdminSidebar";
 
 
 const API_URL =
@@ -205,28 +206,10 @@ export default function AdminDashboardPage() {
     }
 
     return (
-        <main className="min-h-screen bg-slate-100 text-slate-900">
+        <main className="min-h-screen bg-slate-100 text-slate-900 md:flex">
+            {/* <AdminSidebar adminName={admin?.name} /> */}
             {/* Admin header */}
-            <header className="border-b border-slate-200 bg-white">
-                <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-                    <div>
-                        <p className="text-xl font-bold tracking-tight">
-                            Alpha Male
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                            ADMIN DASHBOARD
-                        </p>
-                    </div>
 
-                    <button
-                        type="button"
-                        onClick={logout}
-                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50"
-                    >
-                        Logout
-                    </button>
-                </div>
-            </header>
 
             <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
                 {/* Page heading */}

@@ -4,7 +4,12 @@
 import { useCallback, useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
 import AddProductModal from "../dashboard/modals/AddProductModal";
+import EditProductModal, {
+    type EditProductForm,
+} from "./Components/EditProductModal";
 
+import DeleteProductModal from "./Components/DeleteProductModal"
+import { Pencil, Trash2 } from "lucide-react";
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface Product {
@@ -49,6 +54,28 @@ export default function ProductsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [showAddProduct, setShowAddProduct] = useState(false);
+
+    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+
+    const [editForm, setEditForm] = useState<EditProductForm>({
+        name: "",
+        sku: "",
+        description: "",
+        price: "",
+        compareAtPrice: "",
+        category: "",
+        stock: "",
+        isActive: true,
+        isFeatured: false,
+    });
+
+    const [editLoading, setEditLoading] = useState(false);
+    const [editError, setEditError] = useState("");
+
+    const [deleteConfirmation, setDeleteConfirmation] = useState("");
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
@@ -150,6 +177,118 @@ export default function ProductsPage() {
             month: "short",
             year: "numeric",
         });
+
+
+    const openEditModal = (product: Product) => {
+        setEditingProduct(product);
+        setEditError("");
+
+        setEditForm({
+            name: product.name || "",
+            sku: product.sku || "",
+            description: product.description || "",
+            price: String(product.price ?? ""),
+            compareAtPrice:
+                product.compareAtPrice != null
+                    ? String(product.compareAtPrice)
+                    : "",
+            category: product.category || "",
+            stock: String(product.stock ?? 0),
+            isActive: product.isActive,
+            isFeatured: product.isFeatured,
+        });
+    };
+
+    const handleEditSubmit = async (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        if (!editingProduct) return;
+
+        setEditLoading(true);
+        setEditError("");
+
+        try {
+            const token = localStorage.getItem("adminAccessToken");
+
+            const response = await fetch(
+                `${API_URL}/product/${editingProduct._id}`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        name: editForm.name,
+                        sku: editForm.sku,
+                        description: editForm.description,
+                        price: Number(editForm.price),
+                        compareAtPrice:
+                            editForm.compareAtPrice.trim() === ""
+                                ? null
+                                : Number(editForm.compareAtPrice),
+                        category: editForm.category,
+                        stock: Number(editForm.stock),
+                        isActive: editForm.isActive,
+                        isFeatured: editForm.isFeatured,
+                    }),
+                }
+            );
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || "Failed to update product");
+            }
+
+            setEditingProduct(null);
+            await fetchProducts();
+        } catch (error) {
+            setEditError(
+                error instanceof Error ? error.message : "Something went wrong"
+            );
+        } finally {
+            setEditLoading(false);
+        }
+    };
+
+    const handleDeleteProduct = async () => {
+        if (!deletingProduct) return;
+        if (deleteConfirmation !== "delete") return;
+
+        setDeleteLoading(true);
+        setDeleteError("");
+
+        try {
+            const token = localStorage.getItem("adminAccessToken");
+
+            const response = await fetch(
+                `${API_URL}/product/${deletingProduct._id}`,
+                {
+                    method: "DELETE",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || "Failed to delete product");
+            }
+
+            setDeletingProduct(null);
+            setDeleteConfirmation("");
+            await fetchProducts();
+        } catch (error) {
+            setDeleteError(
+                error instanceof Error ? error.message : "Something went wrong"
+            );
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
 
     return (
         <main className="min-h-screen bg-slate-100">
@@ -392,30 +531,17 @@ export default function ProductsPage() {
                     )}
 
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[850px] text-left">
+                        <table className="w-full min-w-[950px] text-left">
                             <thead className="bg-slate-50">
                                 <tr className="text-xs uppercase tracking-wide text-slate-500">
-                                    <th className="px-5 py-4 font-semibold">
-                                        Product
-                                    </th>
-                                    <th className="px-5 py-4 font-semibold">
-                                        SKU
-                                    </th>
-                                    <th className="px-5 py-4 font-semibold">
-                                        Category
-                                    </th>
-                                    <th className="px-5 py-4 font-semibold">
-                                        Price
-                                    </th>
-                                    <th className="px-5 py-4 font-semibold">
-                                        Stock
-                                    </th>
-                                    <th className="px-5 py-4 font-semibold">
-                                        Status
-                                    </th>
-                                    <th className="px-5 py-4 font-semibold">
-                                        Added
-                                    </th>
+                                    <th className="px-5 py-4 font-semibold">Product</th>
+                                    <th className="px-5 py-4 font-semibold">SKU</th>
+                                    <th className="px-5 py-4 font-semibold">Category</th>
+                                    <th className="px-5 py-4 font-semibold">Price</th>
+                                    <th className="px-5 py-4 font-semibold">Stock</th>
+                                    <th className="px-5 py-4 font-semibold">Status</th>
+                                    <th className="px-5 py-4 font-semibold">Added</th>
+                                    <th className="px-5 py-4 text-right font-semibold">Actions</th>
                                 </tr>
                             </thead>
 
@@ -423,7 +549,7 @@ export default function ProductsPage() {
                                 {loading ? (
                                     <tr>
                                         <td
-                                            colSpan={7}
+                                            colSpan={8}
                                             className="px-5 py-16 text-center text-sm text-slate-500"
                                         >
                                             Loading products...
@@ -431,10 +557,7 @@ export default function ProductsPage() {
                                     </tr>
                                 ) : products.length === 0 ? (
                                     <tr>
-                                        <td
-                                            colSpan={7}
-                                            className="px-5 py-16 text-center"
-                                        >
+                                        <td colSpan={8} className="px-5 py-16 text-center">
                                             <p className="font-semibold text-slate-800">
                                                 No products found
                                             </p>
@@ -449,6 +572,7 @@ export default function ProductsPage() {
                                             key={product._id}
                                             className="transition hover:bg-slate-50"
                                         >
+                                            {/* Product */}
                                             <td className="px-5 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
@@ -469,6 +593,7 @@ export default function ProductsPage() {
                                                         <p className="truncate text-sm font-semibold text-slate-900">
                                                             {product.name}
                                                         </p>
+
                                                         {product.isFeatured && (
                                                             <span className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                                                                 Featured
@@ -478,16 +603,20 @@ export default function ProductsPage() {
                                                 </div>
                                             </td>
 
+                                            {/* SKU */}
                                             <td className="px-5 py-4 text-sm text-slate-600">
                                                 {product.sku}
                                             </td>
 
+                                            {/* Category */}
                                             <td className="px-5 py-4 text-sm capitalize text-slate-600">
                                                 {product.category}
                                             </td>
 
+                                            {/* Price */}
                                             <td className="px-5 py-4 text-sm font-semibold text-slate-900">
                                                 {formatPrice(product.price)}
+
                                                 {product.compareAtPrice != null &&
                                                     product.compareAtPrice > product.price && (
                                                         <p className="mt-1 text-xs font-normal text-slate-400 line-through">
@@ -496,6 +625,7 @@ export default function ProductsPage() {
                                                     )}
                                             </td>
 
+                                            {/* Stock */}
                                             <td className="px-5 py-4">
                                                 <span
                                                     className={`text-sm font-medium ${product.stock === 0
@@ -509,16 +639,52 @@ export default function ProductsPage() {
                                                 </span>
                                             </td>
 
+                                            {/* Status */}
                                             <td className="px-5 py-4">
-                                                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                                                    Active
+                                                <span
+                                                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${product.isActive
+                                                        ? "bg-emerald-50 text-emerald-700"
+                                                        : "bg-slate-100 text-slate-600"
+                                                        }`}
+                                                >
+                                                    {product.isActive ? "Active" : "Inactive"}
                                                 </span>
                                             </td>
 
+                                            {/* Added */}
                                             <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-500">
                                                 {product.createdAt
                                                     ? formatDate(product.createdAt)
                                                     : "—"}
+                                            </td>
+
+                                            {/* Actions */}
+                                            <td className="px-5 py-4">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openEditModal(product)}
+                                                        title="Edit product"
+                                                        aria-label={`Edit ${product.name}`}
+                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                                                    >
+                                                        <Pencil size={16} />
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setDeletingProduct(product);
+                                                            setDeleteConfirmation("");
+                                                            setDeleteError("");
+                                                        }}
+                                                        title="Delete product"
+                                                        aria-label={`Delete ${product.name}`}
+                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
@@ -584,6 +750,42 @@ export default function ProductsPage() {
                     }}
                 />
             )}
+
+
+            {/* Edit Product Modal */}
+            {editingProduct && (
+                <EditProductModal
+                    productName={editingProduct.name}
+                    form={editForm}
+                    setForm={setEditForm}
+                    loading={editLoading}
+                    error={editError}
+                    onClose={() => {
+                        setEditingProduct(null);
+                        setEditError("");
+                    }}
+                    onSubmit={handleEditSubmit}
+                />
+            )}
+
+            {/* Delete Product Modal */}
+            {deletingProduct && (
+                <DeleteProductModal
+                    productName={deletingProduct.name}
+                    stock={deletingProduct.stock}
+                    confirmation={deleteConfirmation}
+                    setConfirmation={setDeleteConfirmation}
+                    loading={deleteLoading}
+                    error={deleteError}
+                    onClose={() => {
+                        setDeletingProduct(null);
+                        setDeleteConfirmation("");
+                        setDeleteError("");
+                    }}
+                    onConfirm={handleDeleteProduct}
+                />
+            )}
+
         </main>
     );
 }
