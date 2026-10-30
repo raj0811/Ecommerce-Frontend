@@ -20,7 +20,7 @@ export default async function PaymentSuccessPage({
                 </div>
 
                 <h1 className="mt-6 text-2xl font-bold text-gray-900">
-                    Payment Successful!
+                    Payment Successful..
                 </h1>
 
                 <p className="mt-3 text-sm leading-6 text-gray-600">
