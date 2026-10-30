@@ -20,8 +20,24 @@ const navigation = [
         icon: "▣",
     },
     {
+        label: "Orders",
+        href: "/admin/dashboard/orders",
+        icon: "⌂",
+    },
+
+    {
+        label: "Ship Rocket Orders",
+        href: "/admin/dashboard/ship-rocket/orders",
+        icon: "⌂",
+    },
+    {
+        label: "Transactions",
+        href: "/admin/transactions",
+        icon: "⌂",
+    },
+    {
         label: "Landing Pages",
-        href: "/admin/landing-pages",
+        href: "/admin/dashboard/landing-pages",
         icon: "▤",
     },
     {

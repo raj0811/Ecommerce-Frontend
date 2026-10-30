@@ -13,10 +13,10 @@ type ApiCartItem = {
 };
 
 type ApiCart = {
-    items: ApiCartItem[];
+    items?: ApiCartItem[];
 };
 
-function getGuestId() {
+function getGuestId(): string {
     let guestId = localStorage.getItem("guestId");
 
     if (!guestId) {
@@ -27,11 +27,25 @@ function getGuestId() {
     return guestId;
 }
 
-function getHeaders(): HeadersInit {
-    return {
-        "Content-Type": "application/json",
-        "x-guest-id": getGuestId(),
-    };
+function getHeaders(options?: RequestInit): Headers {
+    const headers = new Headers(options?.headers);
+
+    if (!headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+    }
+
+    // Read the latest token for every request.
+    const token = localStorage.getItem("accessToken")?.trim();
+
+    if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+        headers.delete("x-guest-id");
+    } else {
+        headers.delete("Authorization");
+        headers.set("x-guest-id", getGuestId());
+    }
+
+    return headers;
 }
 
 function normalizeCart(cart: ApiCart): CartItem[] {
@@ -39,7 +53,7 @@ function normalizeCart(cart: ApiCart): CartItem[] {
         .filter(
             (item) =>
                 typeof item.productId === "object" &&
-                item.productId !== null
+                item.productId !== null,
         )
         .map((item) => ({
             ...(item.productId as StoreProduct),
@@ -47,20 +61,43 @@ function normalizeCart(cart: ApiCart): CartItem[] {
         }));
 }
 
+function extractCart(data: unknown): ApiCart {
+    if (!data || typeof data !== "object") {
+        return { items: [] };
+    }
+
+    const response = data as {
+        items?: ApiCartItem[];
+        cart?: ApiCart;
+    };
+
+    if (response.cart && typeof response.cart === "object") {
+        return response.cart;
+    }
+
+    return response;
+}
+
 async function requestCart(
     path: string,
-    options: RequestInit = {}
-) {
+    options: RequestInit = {},
+): Promise<unknown> {
     if (!API_URL) {
         throw new Error("NEXT_PUBLIC_API_URL is not configured");
     }
 
+    const headers = getHeaders(options);
+
+    // Debug without exposing the token itself.
+    console.log("[Cart API]", {
+        path: `/cart${path}`,
+        hasAccessToken: headers.has("Authorization"),
+        usingGuestId: headers.has("x-guest-id"),
+    });
+
     const response = await fetch(`${API_URL}/cart${path}`, {
         ...options,
-        headers: {
-            ...getHeaders(),
-            ...options.headers,
-        },
+        headers,
     });
 
     const data = await response.json().catch(() => null);
@@ -70,7 +107,7 @@ async function requestCart(
             ? data.message.join(", ")
             : data?.message;
 
-        throw new Error(message || "Cart request failed");
+        throw new Error(message || `Cart request failed (${response.status})`);
     }
 
     return data;
@@ -86,11 +123,13 @@ export default function useCart() {
         setCartError("");
 
         try {
-            const cart: ApiCart = await requestCart("");
-            setItems(normalizeCart(cart));
+            const result = await requestCart("");
+            setItems(normalizeCart(extractCart(result)));
         } catch (error) {
             setCartError(
-                error instanceof Error ? error.message : "Unable to load cart"
+                error instanceof Error
+                    ? error.message
+                    : "Unable to load cart",
             );
         } finally {
             setLoading(false);
@@ -105,7 +144,7 @@ export default function useCart() {
         setCartError("");
 
         try {
-            const cart: ApiCart = await requestCart("/items", {
+            const result = await requestCart("/items", {
                 method: "POST",
                 body: JSON.stringify({
                     productId: product._id,
@@ -113,12 +152,13 @@ export default function useCart() {
                 }),
             });
 
-            setItems(normalizeCart(cart));
+            setItems(normalizeCart(extractCart(result)));
         } catch (error) {
-            const message =
-                error instanceof Error ? error.message : "Unable to add product";
-
-            setCartError(message);
+            setCartError(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to add product",
+            );
             throw error;
         }
     }, []);
@@ -131,33 +171,36 @@ export default function useCart() {
                 if (quantity <= 0) {
                     const result = await requestCart(
                         `/items/${encodeURIComponent(productId)}`,
-                        { method: "DELETE" }
+                        { method: "DELETE" },
                     );
 
-                    setItems(normalizeCart(result.cart));
+                    setItems(normalizeCart(extractCart(result)));
                     return;
                 }
 
-                const cart: ApiCart = await requestCart(
+                if (!Number.isInteger(quantity)) {
+                    throw new Error("Quantity must be a positive integer");
+                }
+
+                const result = await requestCart(
                     `/items/${encodeURIComponent(productId)}`,
                     {
                         method: "PATCH",
                         body: JSON.stringify({ quantity }),
-                    }
+                    },
                 );
 
-                setItems(normalizeCart(cart));
+                setItems(normalizeCart(extractCart(result)));
             } catch (error) {
-                const message =
+                setCartError(
                     error instanceof Error
                         ? error.message
-                        : "Unable to update cart";
-
-                setCartError(message);
+                        : "Unable to update cart",
+                );
                 throw error;
             }
         },
-        []
+        [],
     );
 
     const clearCart = useCallback(async () => {
@@ -168,12 +211,13 @@ export default function useCart() {
                 method: "DELETE",
             });
 
-            setItems(normalizeCart(result.cart));
+            setItems(normalizeCart(extractCart(result)));
         } catch (error) {
-            const message =
-                error instanceof Error ? error.message : "Unable to clear cart";
-
-            setCartError(message);
+            setCartError(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to clear cart",
+            );
             throw error;
         }
     }, []);
