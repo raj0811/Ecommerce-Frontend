@@ -1,4 +1,4 @@
-export const instant = false;
+// export const instant = false;
 type Product = {
     _id: string;
     name?: string;
