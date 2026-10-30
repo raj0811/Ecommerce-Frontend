@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
-import AddProductModal from "../dashboard/modals/AddProductModal";
+import AddProductModal from "../admin/dashboard/modals/AddProductModal";
 import EditProductModal, {
     type EditProductForm,
 } from "./Components/EditProductModal";
