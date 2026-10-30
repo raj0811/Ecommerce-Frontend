@@ -103,7 +103,7 @@ export default function ProductsPage() {
             if (inStock) params.set("inStock", "true");
 
             const response = await fetch(
-                `${API_URL}/product?${params.toString()}`,
+                `${API_URL}/product/admin/fetch-all-product?${params.toString()}`,
                 {
                     headers: token
                         ? { Authorization: `Bearer ${token}` }

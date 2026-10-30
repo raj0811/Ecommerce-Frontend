@@ -45,6 +45,8 @@ export default function AdminLoginPage() {
             }
 
             localStorage.setItem("adminAccessToken", result.accessToken);
+            localStorage.setItem("adminId", result.admin.id);
+            localStorage.setItem("adminRole", result.admin.role);
             router.replace("/admin/dashboard");
         } catch (err) {
             setError(
