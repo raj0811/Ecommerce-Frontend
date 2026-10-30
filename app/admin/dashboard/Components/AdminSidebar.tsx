@@ -41,6 +41,11 @@ const navigation = [
         icon: "▤",
     },
     {
+        label: "Analytics",
+        href: "/admin/dashboard/analytics",
+        icon: "▤",
+    },
+    {
         label: "View Storefront",
         href: "/",
         icon: "⌂",

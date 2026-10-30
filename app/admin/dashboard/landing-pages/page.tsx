@@ -1,6 +1,7 @@
 
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -523,6 +524,14 @@ export default function LandingPagesAdmin() {
                                                         >
                                                             Delete
                                                         </button>
+                                                        <Link
+                                                            href={`/campaing/${encodeURIComponent(page.slug)}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                                                        >
+                                                            View
+                                                        </Link>
                                                     </div>
                                                 </td>
                                             </tr>

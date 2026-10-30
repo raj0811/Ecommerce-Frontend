@@ -3,6 +3,8 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import Navbar from "../components/store/Navbar";
+import useCart from "@/hooks/useCart";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
 
@@ -38,12 +40,27 @@ type TrackingResponse = Record<
     { tracking_data?: TrackingData }
 >[];
 
+// const {
+//     items,
+//     updateQuantity,
+//     clearCart,
+// } = useCart();
+
+// const [isCartOpen, setIsCartOpen] = useState(false);
+
+// const cartCount = items.reduce(
+//     (total, item) => total + item.quantity,
+//     0
+// );
+
 export default function TrackOrderPage() {
     const [orderId, setOrderId] = useState("");
     const [tracking, setTracking] = useState<TrackingData | null>(null);
     const [matchedOrder, setMatchedOrder] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+
+
 
     async function handleTrackOrder(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -117,6 +134,10 @@ export default function TrackOrderPage() {
 
     return (
         <main className="min-h-screen bg-gray-50 text-gray-900">
+            {/* <Navbar
+                cartCount={cartCount}
+                onCartClick={() => setIsCartOpen(true)}
+            /> */}
             <header className="border-b bg-white">
                 <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5">
                     <Link href="/" className="text-xl font-bold">
@@ -203,8 +224,8 @@ export default function TrackOrderPage() {
 
                                 <span
                                     className={`rounded-full px-3 py-1.5 text-sm font-semibold ${hasTracking
-                                            ? "bg-green-50 text-green-700"
-                                            : "bg-amber-50 text-amber-700"
+                                        ? "bg-green-50 text-green-700"
+                                        : "bg-amber-50 text-amber-700"
                                         }`}
                                 >
                                     {status}
