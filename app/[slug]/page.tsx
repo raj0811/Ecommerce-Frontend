@@ -1,4 +1,6 @@
-
+export default function SlugPage() {
+    return null;
+}
 // import { notFound } from "next/navigation";
 
 // const API_URL =
