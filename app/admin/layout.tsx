@@ -1,10 +1,11 @@
 
 "use client";
 
+import { Suspense } from "react";
 import { usePathname } from "next/navigation";
 import AdminSidebar from "./dashboard/Components/AdminSidebar";
 
-export default function AdminLayout({
+function AdminLayoutContent({
     children,
 }: {
     children: React.ReactNode;
@@ -24,5 +25,17 @@ export default function AdminLayout({
                 {children}
             </div>
         </div>
+    );
+}
+
+export default function AdminLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-slate-100" />}>
+            <AdminLayoutContent>{children}</AdminLayoutContent>
+        </Suspense>
     );
 }
