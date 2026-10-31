@@ -42,37 +42,77 @@ export default function Navbar({
     };
 
     return (
-        <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/95 backdrop-blur">
+        <header className="sticky top-0 z-40 border-b border-gray-100 bg-white text-gray-900 backdrop-blur">
             <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
                 <Link href="/" className="text-2xl font-black tracking-tight">
-                    store<span className="text-orange-600">.</span>
+                    store<span className="text-2xl font-black tracking-tight text-gray-900">.</span>
                 </Link>
 
                 <div className="hidden items-center gap-8 text-sm font-medium md:flex">
-                    <Link href="/" className="hover:text-orange-600">
+                    <Link href="/" className="text-gray-900 hover:text-orange-600">
                         Home
                     </Link>
 
-                    <Link href="/#about" className="hover:text-orange-600">
+                    <Link href="/#about" className="text-gray-900 hover:text-orange-600">
                         About
                     </Link>
 
-                    <Link href="/#contact" className="hover:text-orange-600">
+                    <Link href="/#contact" className="text-gray-900 hover:text-orange-600">
                         Contact
                     </Link>
 
-                    <Link href="/track-order" className="hover:text-orange-600">
+                    <Link href="/track-order" className="text-gray-900 hover:text-orange-600">
                         Track
                     </Link>
 
                     {isLoggedIn && (
-                        <Link
-                            href="/orders"
-                            className="hover:text-orange-600"
-                        >
-                            My Orders
-                        </Link>
+                        <>
+
+                            <Link
+                                href="/orders"
+                                className="text-gray-900 hover:text-orange-600"
+                            >
+                                My Orders
+                            </Link>
+                            <Link
+                                href="/ticket"
+                                className="text-gray-900 hover:text-orange-600"
+                            >
+                                Support Tickets
+                            </Link>
+
+                            <Link
+                                href="/user/profile"
+                                className="text-gray-900 hover:text-orange-600"
+                            >
+                                Profile
+                            </Link>
+                        </>
+
+
                     )}
+
+                    {!isLoggedIn && (
+                        <>
+
+                            <Link
+                                href="/user/login"
+                                className="text-gray-900 hover:text-orange-600"
+                            >
+                                Login
+                            </Link>
+                            <Link
+                                href="/user/register"
+                                className="text-gray-900 hover:text-orange-600"
+                            >
+                                Register
+                            </Link>
+                        </>
+
+
+                    )}
+
+
                 </div>
 
                 <div className="flex items-center gap-3">

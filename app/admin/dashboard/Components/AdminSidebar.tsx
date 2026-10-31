@@ -51,10 +51,16 @@ const navigation = [
         icon: "⌂",
     },
     {
+        label: "Support Tickets",
+        href: "/admin/dashboard/support-tockets",
+        icon: "✉",
+    },
+    {
         label: "Profile",
         href: "/admin/dashboard/profile",
         icon: "◉",
     },
+
 ];
 
 const allowedProductRoles = [
@@ -90,22 +96,28 @@ export default function AdminSidebar({
 
     // Filter navigation according to the logged-in admin's role.
     const filteredNavigation = navigation.filter((item) => {
+        if (!isMounted || !adminRole) return false;
+
+        // Sales support can access only Orders and Support Tickets.
+        if (adminRole === "sales_support") {
+            return ["Orders", "Support Tickets", "Profile"].includes(item.label);
+        }
+
+        // Product access for other permitted roles.
         if (item.label === "Products") {
-            return (
-                isMounted &&
-                adminRole !== null &&
-                allowedProductRoles.includes(adminRole)
-            );
+            return allowedProductRoles.includes(adminRole);
         }
 
         return true;
     });
 
+    const renderNavigation = isMounted ? filteredNavigation : [];
+
     // Prevent server/client hydration mismatch.
     // Products appears only after the role has been read from localStorage.
-    const renderNavigation = (isMounted ? filteredNavigation : navigation.filter(
-        (item) => item.label !== "Products"
-    ));
+    // const renderNavigation = (isMounted ? filteredNavigation : navigation.filter(
+    //     (item) => item.label !== "Products"
+    // ));
 
     function isActive(href: string) {
         if (href === "/admin/dashboard") {
@@ -150,8 +162,8 @@ export default function AdminSidebar({
                                     key={item.label}
                                     href={item.href}
                                     className={`flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition ${active
-                                            ? "bg-violet-600 text-white shadow-sm"
-                                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                                        ? "bg-violet-600 text-white shadow-sm"
+                                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
                                         }`}
                                 >
                                     <span className="w-5 text-center text-lg">
@@ -209,8 +221,8 @@ export default function AdminSidebar({
                                 key={item.label}
                                 href={item.href}
                                 className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium ${active
-                                        ? "bg-violet-600 text-white"
-                                        : "bg-slate-100 text-slate-600"
+                                    ? "bg-violet-600 text-white"
+                                    : "bg-slate-100 text-slate-600"
                                     }`}
                             >
                                 {item.label}
