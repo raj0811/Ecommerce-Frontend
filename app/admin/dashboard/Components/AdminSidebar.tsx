@@ -46,8 +46,8 @@ const navigation = [
         icon: "▤",
     },
     {
-        label: "View Storefront",
-        href: "/",
+        label: "Abandoned Cart",
+        href: "/admin/dashboard/abandoned-cart",
         icon: "⌂",
     },
     {

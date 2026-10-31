@@ -172,8 +172,7 @@ export default function LandingPagesAdmin() {
             }
 
             const token =
-                localStorage.getItem('adminAccessToken') ||
-                localStorage.getItem('accessToken');
+                localStorage.getItem('adminAccessToken')
 
             if (!token) {
                 throw new Error('Admin token not found. Please log in again.');
