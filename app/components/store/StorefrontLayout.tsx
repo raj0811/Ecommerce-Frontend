@@ -2,18 +2,37 @@
 "use client";
 
 import { useState } from "react";
-import ConditionalNavbar from "./ConditionalNavbar";
 
-export default function StorefrontLayout({
+import ConditionalNavbar from "./ConditionalNavbar";
+import AnnouncementBar from "@/Components/AnnouncementBar";
+import CartDrawer from "./CartDrawer";
+import { CartProvider } from "@/hooks/useCart";
+import useCart from "@/hooks/useCart";
+
+function StorefrontContent({
     children,
 }: {
     children: React.ReactNode;
 }) {
     const [cartOpen, setCartOpen] = useState(false);
-    const [cartCount] = useState(0);
+
+    const { items, updateQuantity } = useCart();
+
+    const cartCount = items.reduce(
+        (total, item) => total + item.quantity,
+        0
+    );
 
     return (
         <>
+            <AnnouncementBar
+                messages={[
+                    "Free discreet shipping over ₹999",
+                    "Plain packaging, private billing",
+                ]}
+                interval={4000}
+            />
+
             <ConditionalNavbar
                 cartCount={cartCount}
                 onCartClick={() => setCartOpen(true)}
@@ -21,19 +40,26 @@ export default function StorefrontLayout({
 
             {children}
 
-            {cartOpen && (
-                <div className="fixed inset-0 z-50 bg-black/50">
-                    <div className="ml-auto h-full w-full max-w-md bg-white p-6">
-                        <button
-                            onClick={() => setCartOpen(false)}
-                            className="mb-4"
-                        >
-                            Close
-                        </button>
-                        <p>Connect your existing CartDrawer here.</p>
-                    </div>
-                </div>
-            )}
+            <CartDrawer
+                open={cartOpen}
+                items={items}
+                onClose={() => setCartOpen(false)}
+                onUpdateQuantity={updateQuantity}
+            />
         </>
+    );
+}
+
+export default function StorefrontLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    return (
+        <CartProvider>
+            <StorefrontContent>
+                {children}
+            </StorefrontContent>
+        </CartProvider>
     );
 }

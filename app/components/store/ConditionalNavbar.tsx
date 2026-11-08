@@ -2,7 +2,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import Navbar from "./Navbar";
+import Navbar from "@/Components/Navbar";
 
 type ConditionalNavbarProps = {
     cartCount: number;
@@ -15,7 +15,6 @@ export default function ConditionalNavbar({
 }: ConditionalNavbarProps) {
     const pathname = usePathname();
 
-    // Hide storefront navbar on all admin routes.
     if (pathname === "/admin" || pathname.startsWith("/admin/")) {
         return null;
     }

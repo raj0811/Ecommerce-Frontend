@@ -3,13 +3,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "./components/store/Navbar";
-import HeroSlider from "./components/store/HeroSlider";
+import HeroSlider from "@/Components/store/HeroSlider";
 import ProductSection, {
   type StoreProduct,
 } from "./components/store/ProductSection";
 import CartDrawer from "./components/store/CartDrawer";
 import Footer from "./components/store/Footer";
 import useCart from "@/hooks/useCart";
+import SmallBanner from "@/Components/SmallBanner";
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -122,6 +123,7 @@ export default function HomePage() {
         cartCount={cartCount}
         onCartClick={() => setCartOpen(true)}
       /> */}
+
 
       <main>
         <HeroSlider />

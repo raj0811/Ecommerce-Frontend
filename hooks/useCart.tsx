@@ -1,7 +1,15 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useState,
+    type ReactNode,
+} from "react";
+
 import type { CartItem } from "@/app/components/store/CartDrawer";
 import type { StoreProduct } from "@/app/components/store/ProductSection";
 
@@ -15,6 +23,21 @@ type ApiCartItem = {
 type ApiCart = {
     items?: ApiCartItem[];
 };
+
+type CartContextType = {
+    items: CartItem[];
+    loading: boolean;
+    cartError: string;
+    addToCart: (
+        product: StoreProduct,
+        quantity?: number
+    ) => Promise<void>;
+    updateQuantity: (productId: string, quantity: number) => Promise<void>;
+    clearCart: () => Promise<void>;
+    refreshCart: () => Promise<void>;
+};
+
+const CartContext = createContext<CartContextType | undefined>(undefined);
 
 function getGuestId(): string {
     let guestId = localStorage.getItem("guestId");
@@ -34,7 +57,6 @@ function getHeaders(options?: RequestInit): Headers {
         headers.set("Content-Type", "application/json");
     }
 
-    // Read the latest token for every request.
     const token = localStorage.getItem("accessToken")?.trim();
 
     if (token) {
@@ -88,13 +110,6 @@ async function requestCart(
 
     const headers = getHeaders(options);
 
-    // Debug without exposing the token itself.
-    console.log("[Cart API]", {
-        path: `/cart${path}`,
-        hasAccessToken: headers.has("Authorization"),
-        usingGuestId: headers.has("x-guest-id"),
-    });
-
     const response = await fetch(`${API_URL}/cart${path}`, {
         ...options,
         headers,
@@ -107,13 +122,15 @@ async function requestCart(
             ? data.message.join(", ")
             : data?.message;
 
-        throw new Error(message || `Cart request failed (${response.status})`);
+        throw new Error(
+            message || `Cart request failed (${response.status})`,
+        );
     }
 
     return data;
 }
 
-export default function useCart() {
+export function CartProvider({ children }: { children: ReactNode }) {
     const [items, setItems] = useState<CartItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [cartError, setCartError] = useState("");
@@ -140,28 +157,31 @@ export default function useCart() {
         void loadCart();
     }, [loadCart]);
 
-    const addToCart = useCallback(async (product: StoreProduct) => {
-        setCartError("");
+    const addToCart = useCallback(
+        async (product: StoreProduct, quantity: number = 1) => {
+            setCartError("");
 
-        try {
-            const result = await requestCart("/items", {
-                method: "POST",
-                body: JSON.stringify({
-                    productId: product._id,
-                    quantity: 1,
-                }),
-            });
+            try {
+                const result = await requestCart("/items", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        productId: product._id,
+                        quantity,
+                    }),
+                });
 
-            setItems(normalizeCart(extractCart(result)));
-        } catch (error) {
-            setCartError(
-                error instanceof Error
-                    ? error.message
-                    : "Unable to add product",
-            );
-            throw error;
-        }
-    }, []);
+                setItems(normalizeCart(extractCart(result)));
+            } catch (error) {
+                setCartError(
+                    error instanceof Error
+                        ? error.message
+                        : "Unable to add product",
+                );
+                throw error;
+            }
+        },
+        [],
+    );
 
     const updateQuantity = useCallback(
         async (productId: string, quantity: number) => {
@@ -222,13 +242,31 @@ export default function useCart() {
         }
     }, []);
 
-    return {
-        items,
-        loading,
-        cartError,
-        addToCart,
-        updateQuantity,
-        clearCart,
-        refreshCart: loadCart,
-    };
+    return (
+        <CartContext.Provider
+            value={{
+                items,
+                loading,
+                cartError,
+                addToCart,
+                updateQuantity,
+                clearCart,
+                refreshCart: loadCart,
+            }}
+        >
+            {children}
+        </CartContext.Provider>
+    );
+}
+
+export default function useCart() {
+    const context = useContext(CartContext);
+
+    if (!context) {
+        throw new Error(
+            "useCart must be used inside a CartProvider",
+        );
+    }
+
+    return context;
 }
